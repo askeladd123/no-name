@@ -2,7 +2,6 @@
 /node_modules
 /pkg
 /.idea
-*.iml
-*-script.sh
+*.imls
 package-lock.json
 Cargo.lock
