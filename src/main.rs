@@ -1,6 +1,5 @@
-use wgpu_test1::run;
+use no_name::run;
 
 fn main() {
-    tracing_subscriber::fmt::init();
     run();
 }

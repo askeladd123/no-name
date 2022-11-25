@@ -1,3 +1,8 @@
 /target
-.idea
+/node_modules
+/pkg
+/.idea
 *.iml
+*-script.sh
+package-lock.json
+Cargo.lock
