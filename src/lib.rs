@@ -1,5 +1,13 @@
+use cfg_if::cfg_if;
+use winit::window::Window;
+
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
+#[cfg(target_arch = "wasm32")]
+use log::{trace, info, debug, warn, error};
+
+#[cfg(not(target_arch = "wasm32"))]
+use tracing::{trace, info, debug, warn, error};
 
 use winit::{
     event::*,
@@ -10,21 +18,18 @@ use winit::{
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
 pub async fn run() {
 
-    cfg_if::cfg_if! {
+    cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-            console_log::init_with_level(log::Level::Warn).expect("Couldn't initialize logger");
+            console_log::init_with_level(log::Level::Trace).expect("Couldn't initialize logger");
         } else {
             tracing_subscriber::fmt::init();
         }
     }
 
     let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().with_title("Ask er her for deg!").build(&event_loop).unwrap();
+    let window = WindowBuilder::new().build(&event_loop).unwrap();
 
-    let mut state = State::new(&window).await;
-
-    // tracing::info!("mom are not gay");
     #[cfg(target_arch = "wasm32")]
     {
         // Winit prevents sizing with CSS, so we have to set
@@ -33,6 +38,7 @@ pub async fn run() {
         window.set_inner_size(PhysicalSize::new(450, 400));
 
         use winit::platform::web::WindowExtWebSys;
+
         web_sys::window()
             .and_then(|win| win.document())
             .and_then(|doc| {
@@ -44,29 +50,49 @@ pub async fn run() {
             .expect("Couldn't append canvas to document body.");
     }
 
+    let mut state = State::new(&window).await;
+
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
             ref event,
             window_id,
-        } if window_id == window.id() => match event {
-            WindowEvent::CloseRequested
-            | WindowEvent::KeyboardInput {
-                input:
-                KeyboardInput {
-                    state: ElementState::Pressed,
-                    virtual_keycode: Some(VirtualKeyCode::Escape),
+        } if window_id == window.id() => if !state.input(event) {
+            match event {
+                WindowEvent::CloseRequested | WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            state: ElementState::Pressed,
+                            virtual_keycode: Some(VirtualKeyCode::Escape),
+                            ..
+                        },
                     ..
+                } => *control_flow = ControlFlow::Exit,
+                WindowEvent::Resized(physical_size) => {
+                    state.resize(*physical_size)
                 },
-                ..
-            } => *control_flow = ControlFlow::Exit,
-            _ => {}
+                WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                    state.resize(**new_inner_size);
+                },
+                _ => {}
+            }
+        },
+        Event::RedrawRequested(window_id) if window_id == window.id() => {
+            state.update();
+            match state.render() {
+                Ok(_) => {}
+                Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
+                Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
+                Err(e) => eprintln!("{:?}", e),
+            }
+        }
+        Event::MainEventsCleared => {
+            // RedrawRequested will only trigger once, unless we manually
+            // request it.
+            window.request_redraw();
         },
         _ => {}
     });
 }
-
-// lib.rs
-use winit::window::Window;
 
 struct State {
     surface: wgpu::Surface,
@@ -79,10 +105,8 @@ struct State {
 impl State {
     // Creating some of the wgpu types requires async code
     async fn new(window: &Window) -> Self {
-        let size = window.inner_size();
 
-        // The instance is a handle to our GPU
-        // Backends::all => Vulkan + Metal + DX12 + Browser WebGPU
+        let size = window.inner_size();
         let instance = wgpu::Instance::new(wgpu::Backends::all());
         let surface = unsafe { instance.create_surface(window) };
         let adapter = instance.request_adapter(
@@ -105,7 +129,7 @@ impl State {
                 },
                 label: None,
             },
-            None, // Trace path
+            None,
         ).await.unwrap();
 
         let config = wgpu::SurfaceConfiguration {
@@ -117,7 +141,6 @@ impl State {
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
         };
         surface.configure(&device, &config);
-
         Self{ surface, device, queue, config, size }
     }
 
@@ -131,14 +154,48 @@ impl State {
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
-        todo!()
+        false
     }
 
     fn update(&mut self) {
-        todo!()
+        // todo!()
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        todo!()
+        let output = self.surface.get_current_texture()?;
+        let view = output.texture.create_view(
+            &wgpu::TextureViewDescriptor::default()
+        );
+        let mut encoder = self.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor{
+                label: Some("Render Encoder")
+            }
+        );
+
+        {
+            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.1,
+                            g: 0.2,
+                            b: 0.3,
+                            a: 1.0,
+                        }),
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
+        }
+
+        // submit will accept anything that implements IntoIter
+        self.queue.submit(std::iter::once(encoder.finish()));
+        output.present();
+
+        Ok(())
     }
 }
