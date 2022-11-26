@@ -1,1 +1,0 @@
-import("./index.js").catch(e => console.error("Couldn't import index.js: ", e))
