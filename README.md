@@ -7,7 +7,7 @@ You can by clicking this link: [github.io/no-name](https://askeladd123.github.io
 
 ## build native
 You need *cargo* installed. Run ```cargo run --release```.
-> **Alert** only tested on *Windows*
+> **Warning** only tested on *Windows*
 
 ## build web
 You need *wasm-pack* to build. You need a *http server runner* to load and run. Do commands:
