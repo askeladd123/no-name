@@ -1,0 +1,12 @@
+{
+  "name": "no-name",
+  "version": "0.1.0",
+  "files": [
+    "no_name_bg.wasm",
+    "no_name.js",
+    "no_name.d.ts"
+  ],
+  "module": "no_name.js",
+  "types": "no_name.d.ts",
+  "sideEffects": false
+}
