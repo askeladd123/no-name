@@ -1,0 +1,21 @@
+name: Compile, Pack and Deploy
+on: push
+permissions:
+  contents: write
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Installing WASM compiler
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Fetching dependencies
+        run: cargo fetch
+      - name: Building WASM
+        run: wasm-pack build --target web
+      - name: Deleting unnecessary files
+        run: rm -r src target; rm .gitignore pkg/.gitignore README.md pkg/README.md Cargo.lock Cargo.toml
+      - name: Deploying to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: .

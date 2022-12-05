@@ -1,1 +1,0 @@
-import("no-name").catch(e => console.error("Couldn't load wasm: ", e))

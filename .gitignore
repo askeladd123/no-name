@@ -1,7 +1,5 @@
 /target
-/node_modules
 /pkg
 /.idea
 *.imls
-package-lock.json
 Cargo.lock
